@@ -1,0 +1,47 @@
+#!/bin/bash
+#
+#
+#script to list dependencies of a binary
+
+if [ "$#" -eq 0 ]; then
+	echo "Usage : list_deps /full/path/to/binary" 
+	echo "eg: list_deps /usr/bin/binary_name" 
+	echo "No arguments provided."
+	exit
+fi
+
+# Script should be run as root
+if [ $(id -u) == 0 ]; then
+	# The first argument/parameter is the name of the program
+	NAME=$1 
+	if [ -f "$NAME" ]; then
+		# Run ldd against it.
+		LDD_OUTPUT=$(ldd $(which $NAME) | grep 'not found' | cut -d ' ' -f 1 | cut -f 2 | cut -d '.' -f 1 | sort | uniq | paste -d ' ' -s)   
+
+		# If no dependencies foudn by LDD_OUTPUT then print accordingly.
+		if [ "$(echo $LDD_OUTPUT | wc -w)" == 0 ]; then
+    			echo "No missing dependencies found."
+    			exit 0
+		fi
+
+		# initialize package list with a space which also will be used as a seperator.
+		PKGLIST=" "
+
+		# Run a search for each item found by LDD_OUTPUT variable.
+		# And format the output as needed by npkg
+		for var in "$LDD_OUTPUT"; do
+  			PKGLIST="${PKGLIST} $(npkg file-search "$var" | grep unin | cut -d ' ' -f 4 | paste -d ' ' -s)"
+		done
+
+		# Sort output from above and remove duplicates
+		PKGLIST=$(echo $PKGLIST| tr '\ ' '\n' | sort | uniq | paste -d ' ' -s)
+
+    		npkg install $PKGLIST
+	else
+		echo "$NAME : No such file found."
+		exit
+	fi
+else
+    echo "Kindly run the script as root to list the dependencies..."
+fi
+
